@@ -69,8 +69,16 @@ the cell is left blank.
 - Audit columns appended to the right: API Source, Original API (as received),
   Matched Enverus Well Name, Match Method, Match Confidence, Corroborating
   Fields, Match Notes.
-- A QC workbook: Summary (COUNTIF formulas over the detail sheet), Match Detail
-  (every row, with runner-up candidates and API drift), Review Queue.
+- A QC workbook: Summary, Match Detail (every row, with runner-up candidates
+  and API drift), and a Review Queue of everything flagged plus every undrilled
+  location where a near name exists and someone who knows the asset could
+  confirm or reject it.
+
+The Summary carries both a live `COUNTIF` over the detail sheet and the count
+the run produced, in adjacent columns. openpyxl writes formulas with no cached
+value, so the live column reads blank until a spreadsheet application opens the
+file; the generated column keeps the numbers readable anywhere, and the two
+cross-check each other.
 
 ## Running it
 

@@ -255,12 +255,14 @@ def match_row(row, by_county, exact_idx, token_idx):
         if hits:
             return None, "no_match", "review", (
                 "undrilled location; %d wells share this name" % len(hits)), []
-        ranked = rank(row, narrow(row, pool, token_idx))
+        ranked = sorted(rank(row, narrow(row, pool, token_idx)),
+                        key=lambda c: c.sim, reverse=True)
         near = ""
         if ranked and ranked[0].sim >= SIM_FLOOR:
             near = ("; nearest name in county is %s %s (similarity %.2f)"
-                    " -- NOT applied, most likely a different well on the"
-                    " same pad" % (ranked[0].api, ranked[0].name, ranked[0].sim))
+                    " -- NOT applied. Usually a sibling well on the same pad or"
+                    " an unrelated older well; confirm before using"
+                    % (ranked[0].api, ranked[0].name, ranked[0].sim))
         return None, "no_match", "no_api_expected", (
             "undrilled location; no exact name match in county" + near), ranked[:4]
 
@@ -376,11 +378,11 @@ def write_report(path, report, header_file, enverus_file):
         return ws
 
     sheet("Match Detail", report)
-    review = [r for r in report if not r["Corrected API"]
-              and r["Status"] != "no_api_expected"]
-    unresolved = [r for r in report
-                  if not r["Corrected API"] and "nearest name" in (r["Notes"] or "")]
-    sheet("Review Queue", review or unresolved)
+    # Worth a human's time: anything flagged, plus undrilled locations where a
+    # near name exists and someone who knows the asset could confirm or reject it.
+    sheet("Review Queue", [r for r in report if not r["Corrected API"]
+                           and (r["Status"] != "no_api_expected"
+                                or "nearest name" in (r["Notes"] or ""))])
 
     ws = wb["Sheet"]
     ws.title = "Summary"
