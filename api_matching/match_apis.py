@@ -308,8 +308,6 @@ AUDIT_HEADERS = [
     "Match Method", "Match Confidence", "Corroborating Fields", "Match Notes",
 ]
 
-CORROBORATORS = ("Spud", "First Prod", "Lateral Length", "Operator")
-
 
 def corroborating_fields(row, cand, lookup):
     if not cand:
@@ -332,18 +330,18 @@ def corroborating_fields(row, cand, lookup):
 SUMMARY_ROWS = [
     ("Rows in header file", "COUNTA"),
     ("", None),
-    ("API corrected from Enverus", 'Status="corrected"'),
-    ("API already correct", 'Status="unchanged"'),
-    ("Undrilled location - left blank", 'Status="no_api_expected"'),
-    ("Flagged for review - original retained", 'Status="flagged_kept_original"'),
-    ("Flagged for review - still blank", 'Status="flagged_blank"'),
+    ("API corrected from Enverus", 'Status=corrected'),
+    ("API already correct", 'Status=unchanged'),
+    ("Undrilled location - left blank", 'Status=no_api_expected'),
+    ("Flagged for review - original retained", 'Status=flagged_kept_original'),
+    ("Flagged for review - still blank", 'Status=flagged_blank'),
     ("", None),
-    ("Matched on exact well name", 'Match Method="exact_name"'),
-    ("Matched on exact name, tie broken by data", 'Match Method="exact_name_tiebreak"'),
-    ("Matched on corroborated fuzzy name", 'Match Method="fuzzy_corroborated"'),
+    ("Matched on exact well name", 'Match Method=exact_name'),
+    ("Matched on exact name, tie broken by data", 'Match Method=exact_name_tiebreak'),
+    ("Matched on corroborated fuzzy name", 'Match Method=fuzzy_corroborated'),
     ("", None),
-    ("High confidence", 'Confidence="high"'),
-    ("Medium confidence", 'Confidence="medium"'),
+    ("High confidence", 'Confidence=high'),
+    ("Medium confidence", 'Confidence=medium'),
 ]
 
 
@@ -377,7 +375,7 @@ def write_report(path, report, header_file, enverus_file):
         ws.auto_filter.ref = ws.dimensions
         return ws
 
-    detail = sheet("Match Detail", report)
+    sheet("Match Detail", report)
     review = [r for r in report if not r["Corrected API"]
               and r["Status"] != "no_api_expected"]
     unresolved = [r for r in report
@@ -392,12 +390,18 @@ def write_report(path, report, header_file, enverus_file):
 
     ws["A1"] = "API correction QC summary"
     ws["A1"].font = Font(name="Calibri", size=14, bold=True)
-    meta = [("Header file", header_file), ("Enverus export", enverus_file),
-            ("Counts below are COUNTIF formulas over the Match Detail sheet",
-             "they update if you edit it")]
-    for r, (label, value) in enumerate(meta, start=3):
+    for r, (label, value) in enumerate(
+            [("Header file", header_file), ("Enverus export", enverus_file)], start=3):
         ws.cell(row=r, column=1, value=label).font = body_font
         ws.cell(row=r, column=2, value=value).font = body_font
+
+    row = 6
+    for i, title in enumerate(("", "Live count", "Count when generated"), start=1):
+        cell = ws.cell(row=row, column=i, value=title)
+        cell.font = head_font
+        cell.fill = head_fill if title else PatternFill()
+    ws.cell(row=row, column=2).alignment = Alignment(horizontal="right")
+    ws.cell(row=row, column=3).alignment = Alignment(horizontal="right")
 
     row = 7
     for label, rule in SUMMARY_ROWS:
@@ -408,17 +412,28 @@ def write_report(path, report, header_file, enverus_file):
         if rule == "COUNTA":
             formula = "=COUNTA('Match Detail'!%s2:%s%d)" % (
                 col_of["Prop_ID"], col_of["Prop_ID"], last)
+            tally = sum(1 for rec in report if rec["Prop_ID"])
         else:
             field, value = rule.split("=", 1)
-            formula = "=COUNTIF('Match Detail'!%s2:%s%d,%s)" % (
+            formula = '=COUNTIF(\'Match Detail\'!%s2:%s%d,"%s")' % (
                 col_of[field], col_of[field], last, value)
-        cell = ws.cell(row=row, column=2, value=formula)
-        cell.font = body_font
-        cell.number_format = "#,##0"
+            tally = sum(1 for rec in report if rec[field] == value)
+        for column, content in ((2, formula), (3, tally)):
+            cell = ws.cell(row=row, column=column, value=content)
+            cell.font = body_font
+            cell.number_format = "#,##0"
+            cell.alignment = Alignment(horizontal="right")
         row += 1
 
+    ws.cell(row=row + 1, column=1,
+            value="'Live count' recalculates against the Match Detail sheet. "
+                  "'Count when generated' is what this run produced -- the two "
+                  "should agree unless Match Detail has been edited."
+            ).font = Font(name="Calibri", size=9, italic=True)
+
     ws.column_dimensions["A"].width = 44
-    ws.column_dimensions["B"].width = 58
+    ws.column_dimensions["B"].width = 16
+    ws.column_dimensions["C"].width = 22
     wb.save(path)
 
 
